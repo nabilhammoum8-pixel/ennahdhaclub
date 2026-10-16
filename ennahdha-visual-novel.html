@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12091a">
+<title>Rejoins Ennahdha — Visual Novel du club scientifique</title>
+<style>
+:root{--pink:#2f6fed;--pink2:#9cc3ff;--deep:#1b3f9a;--glass:rgba(24,12,34,.76)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#12091a;overflow:hidden;font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;color:#fff}
+button{font-family:inherit;cursor:pointer;color:inherit;border:none}
+#stage{position:fixed;inset:0;overflow:hidden;user-select:none;-webkit-user-select:none}
+.bg{position:absolute;inset:0;opacity:0;transition:opacity 1s ease}
+.bg.on{opacity:1}
+.bg svg{width:100%;height:100%;display:block}
+#vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.5))}
+#petals{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.petal{position:absolute;bottom:-30px;border-radius:60% 0 60% 0;background:rgba(249,168,212,.75);animation:floaty linear infinite}
+@keyframes floaty{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:.9}100%{transform:translate(70px,-115vh) rotate(420deg);opacity:0}}
+
+/* personnages */
+#chars{position:absolute;left:0;right:0;bottom:0;height:90%;display:flex;pointer-events:none}
+.slot{flex:1;display:flex;justify-content:center;align-items:flex-end;opacity:0;transform:translateY(46px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.8,.2,1),filter .5s ease}
+.slot.show{opacity:1;transform:translateY(0)}
+.slot.show.act{transform:translateY(-8px) scale(1.035);z-index:2}
+.slot.dim{filter:brightness(.55) saturate(.75)}
+.slot svg{height:100%;width:auto;flex:none;filter:drop-shadow(0 12px 26px rgba(0,0,0,.35))}
+.all{animation:breathe 4.2s ease-in-out infinite}
+@keyframes breathe{50%{transform:translateY(5px)}}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite;animation-delay:var(--d,0s)}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+.talking .mouth{transform-box:fill-box;transform-origin:center;animation:talk .24s ease-in-out infinite alternate}
+@keyframes talk{to{transform:scaleY(1.75)}}
+.tear{animation:tear 1.8s infinite;opacity:0}
+.t2{animation-delay:.8s}
+@keyframes tear{0%{transform:translateY(0);opacity:0}20%{opacity:.9}100%{transform:translateY(24px);opacity:0}}
+
+/* HUD */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;z-index:20;pointer-events:none}
+#hud>*{pointer-events:auto}
+.chip{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:8px 14px;font-size:13px;display:flex;align-items:center;gap:10px}
+#chlabel{opacity:.9;max-width:44vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{width:90px;height:7px;border-radius:9px;background:rgba(255,255,255,.18);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#9cc3ff,#2f6fed);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.tools{display:flex;gap:8px}
+.ib{width:38px;height:38px;border-radius:50%;background:var(--glass);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.16);font-size:17px;display:grid;place-items:center;transition:transform .2s,background .2s}
+.ib:hover{transform:scale(1.1);background:rgba(47,111,237,.55)}
+
+/* dialogue */
+#dlg{position:absolute;left:50%;bottom:3.5%;transform:translateX(-50%);width:min(1080px,94vw);min-height:150px;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:22px;padding:30px 30px 26px;z-index:10;cursor:pointer;box-shadow:0 20px 60px rgba(0,0,0,.45);transition:opacity .4s,transform .4s}
+#dlg.hid{opacity:0;pointer-events:none;transform:translateX(-50%) translateY(20px)}
+#name{position:absolute;top:-17px;left:26px;padding:6px 18px;border-radius:999px;font-weight:700;font-size:15px;color:#1b1024;letter-spacing:.3px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+#txt{font-size:clamp(16px,2.1vw,23px);line-height:1.55;min-height:3.1em}
+#txt.i{font-style:italic;color:#e9d5ff}
+#nxt{position:absolute;right:22px;bottom:10px;color:var(--pink2);animation:bob 1s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(5px)}}
+
+/* choix */
+#choices{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;padding:20px 20px 150px;background:rgba(10,4,20,.38);opacity:0;pointer-events:none;transition:opacity .35s}
+#choices.on{opacity:1;pointer-events:auto}
+.choice{width:min(740px,92vw);text-align:left;padding:18px 22px 18px 58px;border-radius:18px;font-size:clamp(15px,1.9vw,19px);line-height:1.4;background:linear-gradient(135deg,rgba(47,111,237,.9),rgba(131,24,67,.92));border:1px solid rgba(255,255,255,.3);box-shadow:0 12px 34px rgba(47,111,237,.28);position:relative;animation:slideup .5s both cubic-bezier(.2,.9,.3,1.1);transition:transform .2s,box-shadow .2s}
+.choice:hover{transform:translateY(-3px) scale(1.012);box-shadow:0 16px 42px rgba(47,111,237,.5)}
+.choice .k{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-weight:700;font-size:14px}
+@keyframes slideup{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+
+#toast{position:absolute;top:70px;left:50%;transform:translate(-50%,-20px);z-index:25;background:rgba(255,255,255,.95);color:#4a0d2c;padding:10px 20px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:all .4s;max-width:92vw;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast.neg{background:#fde2e2;color:#7f1d1d}
+
+/* modales */
+#modal,#aux{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:30;background:rgba(10,4,20,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:16px}
+#aux{z-index:70}
+#modal.on,#aux.on{display:flex}
+.card{width:min(760px,94vw);max-height:90vh;overflow:auto;background:linear-gradient(160deg,#2c1340,#1b0f27);border:1px solid rgba(249,168,212,.35);border-radius:26px;padding:28px 30px;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:pop .5s cubic-bezier(.2,1.2,.3,1)}
+@keyframes pop{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:none}}
+.card h2{font-size:clamp(20px,3vw,27px);margin-bottom:6px;line-height:1.25}
+.card .ic{font-size:40px;margin-bottom:6px}
+.card .tagq{display:inline-block;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--pink2);margin-bottom:10px;font-weight:700}
+.card ul{list-style:none;margin:14px 0}
+.card li{padding:11px 14px 11px 40px;margin-bottom:8px;border-radius:12px;background:rgba(255,255,255,.07);position:relative;line-height:1.45;animation:slideup .5s both}
+.card li::before{content:"♥";position:absolute;left:14px;color:var(--pink)}
+.foot{margin:14px 0 18px;padding:12px 14px;border-left:3px solid var(--pink);background:rgba(47,111,237,.12);border-radius:0 12px 12px 0;line-height:1.5;font-size:15px}
+.btn{display:inline-block;padding:13px 26px;border-radius:999px;font-weight:700;font-size:16px;background:linear-gradient(135deg,#f472b6,#be185d);box-shadow:0 10px 26px rgba(47,111,237,.4);transition:transform .2s}
+.btn:hover{transform:translateY(-2px) scale(1.03)}
+.btn.ghost{background:rgba(255,255,255,.1);box-shadow:none;border:1px solid rgba(255,255,255,.25)}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.qb{flex:1;min-width:130px;padding:16px;border-radius:16px;font-size:18px;font-weight:700;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);transition:all .2s}
+.qb:hover:not(:disabled){background:rgba(47,111,237,.4)}
+.qb.ok{background:#15803d;border-color:#4ade80}
+.qb.ko{background:#991b1b;border-color:#f87171}
+.qb:disabled{cursor:default;opacity:.85}
+#qres{margin-top:14px}
+.dots{display:flex;gap:7px;justify-content:center;margin:16px 0}
+.dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .3s}
+.dots i.on{background:var(--pink);transform:scale(1.35)}
+.step{text-align:center;padding:10px 0;animation:slideup .45s both}
+.step .big{font-size:64px}
+.step h3{font-size:24px;margin:6px 0}
+.step p{line-height:1.6;font-size:16px;color:#f3e8ff}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+@media(max-width:620px){.cmp{grid-template-columns:1fr}}
+.col{border-radius:18px;padding:16px;background:rgba(255,255,255,.06)}
+.col h3{font-size:17px;margin-bottom:10px}
+.col.a{border:1px solid #4ade80}.col.a h3{color:#86efac}
+.col.n{border:1px solid #fbbf24}.col.n h3{color:#fcd34d}
+.ev{padding:9px 0 9px 22px;border-left:2px dashed rgba(255,255,255,.3);margin-left:6px;position:relative;font-size:14px;line-height:1.4;animation:slideup .5s both}
+.ev::before{content:"";position:absolute;left:-7px;top:13px;width:12px;height:12px;border-radius:50%;background:var(--c)}
+.col.a{--c:#4ade80}.col.n{--c:#fbbf24}
+.ev b{display:block;font-size:12px;opacity:.75;letter-spacing:.5px;text-transform:uppercase}
+.log p{margin-bottom:10px;line-height:1.45;font-size:15px}
+.log b{margin-right:6px}
+
+/* carte chapitre */
+#chap{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 40%,#42175a,#12091a 70%);opacity:0;pointer-events:none;transition:opacity .7s ease;padding:20px}
+#chap.on{opacity:1}
+#chap small{letter-spacing:6px;text-transform:uppercase;color:var(--pink2);font-size:15px;opacity:0;transform:translateY(14px);transition:all .8s .3s}
+#chap h1{font-size:clamp(30px,6vw,64px);margin-top:12px;font-weight:800;opacity:0;transform:translateY(20px);transition:all .9s .5s}
+#chap .line{width:0;height:3px;background:linear-gradient(90deg,transparent,var(--pink),transparent);margin-top:22px;transition:width 1.2s .7s}
+#chap.on small,#chap.on h1{opacity:1;transform:none}
+#chap.on .line{width:min(420px,70vw)}
+
+/* fin */
+#end{position:absolute;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,rgba(66,23,90,.94),rgba(18,9,26,.97));padding:16px;overflow:auto}
+#end.on{display:flex}
+#end .card{width:min(820px,96vw);text-align:center}
+#end .big{font-size:13px;letter-spacing:5px;text-transform:uppercase;color:var(--pink2)}
+#end h1{font-size:clamp(28px,5vw,46px);margin:6px 0 10px}
+#end .sc{margin:16px auto;max-width:360px}
+#end .bar{width:100%;height:12px;margin-top:8px}
+#end ul{text-align:left}
+.stat{font-size:17px;font-weight:600;color:#fde68a;margin:12px 0}
+.small{font-size:12px;opacity:.7;line-height:1.5;margin-top:14px}
+
+/* titre */
+#title{position:absolute;inset:0;z-index:50;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;transition:opacity .8s,visibility .8s}
+#title.gone{opacity:0;visibility:hidden}
+.tbg{position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,#6b2a7e 0,#2a1040 45%,#12091a 100%);}
+.tbg::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 80%,rgba(47,111,237,.35),transparent 40%),radial-gradient(circle at 85% 20%,rgba(249,168,212,.25),transparent 40%)}
+.tcontent{position:relative;z-index:2;padding:5vh 20px 0;max-width:760px}
+.kicker{letter-spacing:5px;text-transform:uppercase;font-size:clamp(11px,1.6vw,14px);color:var(--pink2)}
+#title h1{font-size:clamp(38px,8vw,86px);line-height:1;margin:12px 0;font-weight:800;background:linear-gradient(180deg,#fff,#9cc3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:clamp(14px,2vw,19px);opacity:.88;margin-bottom:22px;line-height:1.5}
+.rib svg{width:clamp(50px,8vw,80px);animation:bob 2.4s ease-in-out infinite;filter:drop-shadow(0 0 18px rgba(47,111,237,.8))}
+#title .btn{margin:6px}
+.univ{margin-top:14px;font-size:13px;opacity:.7}
+.tri{position:absolute;left:0;right:0;bottom:0;height:46%;display:flex;justify-content:center;align-items:flex-end;z-index:1;opacity:.95}
+.tri svg{height:100%;width:auto;flex:none;margin:0 -2vw}
+.tri svg:nth-child(2){height:112%}
+
+@media (max-aspect-ratio:1/1){
+ #chars{height:72%}
+ .slot svg{width:175%;height:auto;max-height:100%}
+ .slot.dim{filter:brightness(.55) saturate(.75)}
+ #dlg{padding:26px 18px 22px;min-height:140px}
+ #chlabel{max-width:36vw}
+ .bar{width:56px}
+ .tri{height:34%}
+ .tri svg{height:auto;width:46vw;max-height:100%}
+ .tri svg:nth-child(2){height:auto;width:52vw}
+}
+@media (prefers-reduced-motion:reduce){.all,.petal,.eye{animation:none}}
+
+/* langue / crédits / RTL */
+.lg{position:absolute;top:14px;right:16px;z-index:5;font-weight:700}
+.lg:hover{background:rgba(47,111,237,.55)}
+#credit{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;justify-content:center;padding:8px 10px;pointer-events:auto}
+.cr{display:flex;flex-wrap:wrap;gap:4px 18px;justify-content:center;align-items:center;font-size:11.5px;line-height:1.35;background:rgba(18,9,26,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:7px 14px;text-align:center}
+.cr b{color:var(--pink2)}.cr em{opacity:.75;font-style:normal;width:100%}
+.card .cr{margin-top:14px;font-size:12px}
+.rtl #txt,.rtl #dlg,.rtl .card,.rtl #choices,.rtl #chap,.rtl #toast,.rtl #title .tcontent{direction:rtl}
+.rtl *{letter-spacing:0!important}.rtl #txt.i{font-style:normal}
+.rtl #name{left:auto;right:26px}.rtl #nxt{right:auto;left:22px}
+.rtl .choice{text-align:right;padding:18px 58px 18px 22px}.rtl .choice .k{left:auto;right:16px}
+.rtl .card li{padding:11px 40px 11px 14px}.rtl .card li::before{left:auto;right:14px}
+.rtl .foot{border-left:0;border-right:3px solid var(--pink);border-radius:12px 0 0 12px}
+.rtl .ev{padding:9px 22px 9px 0;border-left:0;border-right:2px dashed rgba(255,255,255,.3);margin-left:0;margin-right:6px}
+.rtl .ev::before{left:auto;right:-7px}.rtl #end ul{text-align:right}.rtl .lg{right:auto;left:16px}
+@media (max-aspect-ratio:1/1){.cr{font-size:10px;gap:2px 10px;padding:5px 9px}.tri{bottom:46px}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg" id="bgA"></div><div class="bg" id="bgB"></div>
+  <div id="petals"></div>
+  <div id="vig"></div>
+  <div id="chars"><div class="slot" id="sL"></div><div class="slot" id="sC"></div><div class="slot" id="sR"></div></div>
+
+  <div id="hud">
+    <div class="chip"><span id="chlabel">—</span></div>
+    <div class="chip" title="Ton score de sensibilisation">
+      <svg width="16" height="20" viewBox="-20 -28 40 60"><path d="M0 -14 C-12 -32 -30 -14 -12 0 L10 26 M0 -14 C12 -32 30 -14 12 0 L-10 26" stroke="#ff4fa3" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="bar"><i id="fill"></i></div>
+    </div>
+    <div class="tools">
+      <button class="ib" id="bLog" title="Journal des dialogues" aria-label="Journal">📜</button>
+      <button class="ib" id="bLang">🌐</button>
+      <button class="ib" id="bSnd" title="Son / musique" aria-label="Son">🔊</button>
+      <button class="ib" id="bFs" title="Plein écran" aria-label="Plein écran">⛶</button>
+      <button class="ib" id="bInfo" title="Aide et informations" aria-label="Aide">ⓘ</button>
+    </div>
+  </div>
+
+  <div id="choices"></div>
+  <div id="dlg" class="hid"><div id="name"></div><div id="txt"></div><div id="nxt">▼</div></div>
+  <div id="toast"></div>
+  <div id="modal"></div>
+  <div id="chap"></div>
+  <div id="end"></div>
+
+  <div id="title">
+    <div class="tbg"></div><button class="chip lg" id="tLang"></button>
+    <div class="tcontent">
+      <div class="rib"><svg viewBox="-20 -28 40 60"><path d="M0 -14 C-12 -32 -30 -14 -12 0 L10 26 M0 -14 C12 -32 30 -14 12 0 L-10 26" stroke="#ff4fa3" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <p class="kicker" id="kk"></p>
+      <h1 id="tt"></h1>
+      <p class="sub" id="sb">Une visual novel interactive : deux amies de 21 ans, un médecin, et une décision qui change tout.</p>
+      <button class="btn" id="start">▶ Commencer</button>
+      <button class="btn ghost" id="how">Comment jouer · À propos</button>
+      <p class="univ" id="univ"></p>
+    </div>
+    <div class="tri" id="tri"></div><div id="credit"></div>
+  </div>
+  <div id="aux"></div>
+</div>
+
+<script>
+/* ============ PERSONNALISATION ============ */
+const UNIV="Université — Club scientifique Ennahdha";   // <-- modifie ce nom
+/* ============================================ */
+
+const $=s=>document.querySelector(s);
+const COL={nour:'#fbbf24',amira:'#f472b6',doc:'#7dd3fc',you:'#c4b5fd'};
+
+/* ---------- LANGUES / i18n (FR · EN · AR) ---------- */
+let lang='fr',chIdx=null,lastEnd=null;
+const LN={fr:'Français',en:'English',ar:'العربية'};
+const NM={fr:{nour:'Sara',amira:'Amira',doc:'Pr. Karim',you:'Toi'},en:{nour:'Sara',amira:'Amira',doc:'Prof. Karim',you:'You'},ar:{nour:'سارة',amira:'أميرة',doc:'الأستاذ كريم',you:'أنت'}};
+const NAMES=new Proxy({},{get:(_,k)=>(NM[lang]||NM.fr)[k]});
+const I18N={
+en:{H:{0:"Chapter 1 · The club stand",13:"Chapter 2 · Sara's doubts",18:"Chapter 3 · In front of the library",27:"Chapter 4 · The club workshop",44:"End A · She joins Ennahdha",50:"End B · One step at a time",55:"End C · Not this time"},
+S:{
+0:"First Monday of the term. On campus, the Ennahdha scientific club runs its stand: robots, test tubes, posters… Your mission: convince Sara, a brilliant student, to join the club.",
+1:"Amira, the club president, waits for you at the stand with a big smile.",
+2:"Sara is a real brain: top of her year in physics. But she turns down every invitation. We have to convince her… with respect. Will you help?",
+3:"A little further away, Sara is reading a book, earphones on, looking like she's saying “don't bother me”.",
+4:["How do you approach her?",["“Hi Sara! Your physics results are impressive. Do you know the Ennahdha club?”","A sincere compliment opens the conversation."],["“Join us, it's great, everyone comes!”"]],
+5:"Another person selling me a club… No thanks, I don't have time to waste.",
+6:"Easy… Sorry, Sara. Just tell us what you think about clubs.",
+7:"Honestly? Clubs are mostly talk and photos. I prefer to study alone.",
+8:["Sara thinks a club is a waste of time. Which argument do you pick?",["“At the club, we do real experiments that classes don't show. And it counts on a CV.”","A concrete benefit answers her objection."],["“You'll see, it's fun.”"]],
+9:"Real experiments? …Okay, that interests me a little.",
+10:"“Fun” doesn't mean anything.",
+11:"Also, I'm rather shy. I've never presented anything in front of people.",
+12:"I'll think about it. Meet me tomorrow in front of the library.",
+13:"In the evening, in her room, Sara thinks back over her day. The club keeps coming back to her mind.",
+14:"A scientific club… what if I'm not good enough? The others surely know everything already.",
+15:"I'm good with books. But in a real lab, with people? I'll look useless.",
+16:"And what if I got bored? I'd lose revision hours. But… what if it were thrilling?",
+17:["Why do people hesitate to join a club?",["Fear of not being good enough.","Shyness: they don't know anyone.","Fear of losing study time.","They don't know what is actually done there.","They already tried a boring club."],"When you understand what holds the other person back, you can answer the real reason."],
+18:"The next day, late afternoon. Sara is already there, her book pressed against her.",
+19:"Thank you for coming, Sara.",
+20:"I've thought about it. But I have doubts: I'm not sure I'm at the level, and I don't want to waste my time.",
+21:["How do you answer?",["“I understand. At the club nobody is an expert at the start: we learn together, each at their own pace.”","Reassuring answers the real fear."],["“You're the best of your year, you have no reason to be afraid.”","A compliment helps, but it doesn't listen to the fear."],["“If you don't come, that's your problem.”","Pressure closes the door."]],
+22:"…That reassures me. I was afraid of being the only one who knows nothing.",
+23:"That's kind, but being good in class doesn't mean I'll be useful in a project.",
+24:"Wow. That's exactly why I don't like clubs.",
+25:"Sorry, Sara. He just meant that the door stays open.",
+26:"Come see what we really do. On Saturday we build a mini-robot and test a solar sensor. Just come to watch.",
+27:"Welcome, Sara. I'm Professor Karim, the club's advisor. Here you're allowed to make mistakes: that's how we discover things.",
+28:"And what if I don't know how?",
+29:"Then you ask questions. Older members help the new ones, and we share the tasks.",
+30:"Sara looks at the robot, the sensors, the diagrams… her eyes light up in spite of herself.",
+31:"Look at these two paths. Same student, two different choices.",
+33:"I'm no more gifted than you, Sara. I just dared to come on the first day.",
+34:"And you listened instead of forcing her hand. Let's see what you remember: true or false?",
+35:["To convince someone, you must first talk a lot about yourself.","False. Listening first helps you understand their real reasons to hesitate."],
+36:["A sincere compliment helps build trust.","True. As long as it's honest and specific."],
+37:["Forcing someone to come always works.","False. Pressure creates refusal. Better to suggest and let them choose."],
+38:["You must be an expert to join a scientific club.","False. A club exists precisely to learn, with others."],
+39:["What the Ennahdha club gives you",["Concrete projects: robotics, solar energy, chemistry, programming.","Useful skills: teamwork, public speaking, rigor.","A network: peers, alumni, teachers.","Competitions, exhibitions and science days.","A place to learn by trying, even by making mistakes."],"Joining Ennahdha isn't wasting time: it's learning differently."],
+40:"To convince someone in turn, here's a four-step method.",
+41:[["1 · Listen","Let the other person say what holds them back, without interrupting or labeling."],["2 · Understand","Find the real reason for the refusal: fear, lack of time, doubt, lack of information."],["3 · Answer","Give a concrete benefit and an example, not a slogan."],["4 · Invite","Suggest a simple first step (a trial session) and let the person choose freely."]],
+42:"Sara, the decision is yours. What do you think?",
+45:"Welcome to Ennahdha, Sara.",
+44:"I'm signing up. Thank you for not forcing me: that's why I said yes.",
+46:"A few months later, Sara presents her first project in front of the whole faculty: a low-cost solar sensor. She is the first to invite newcomers.",
+47:"I was afraid of wasting my time. I've never learned so much.",
+48:"And next time, you'll be the one convincing someone.",
+50:"Okay… I'll come to a trial session. No more, for now.",
+51:"That's already a very good first step.",
+52:"Sara comes to two sessions, still hesitates, then gets caught up in it. She will sign up before the end of the month.",
+53:"One step at a time. And we don't give up.",
+55:"Thank you, but no. I prefer to stay alone with my classes.",
+56:"I respect your decision. The club's door stays open.",
+57:"Sara walks away. There was no argument, but no spark either.",
+58:"Maybe we talked too much and listened too little. Next time, we'll start by listening.",
+59:"It's not a disaster: you can always try again, differently. But this time, the club didn't gain a future researcher."}},
+ar:{H:{0:"الفصل 1 · ركن النادي",13:"الفصل 2 · شكوك سارة",18:"الفصل 3 · أمام المكتبة",27:"الفصل 4 · ورشة النادي",44:"النهاية أ · تنضم إلى النهضة",50:"النهاية ب · خطوة بعد خطوة",55:"النهاية ج · ليس هذه المرة"},
+S:{
+0:"أول يوم اثنين من الدخول الجامعي. في الحرم، يقيم نادي النهضة العلمي ركنه: روبوتات، أنابيب اختبار، ملصقات… مهمتك: إقناع سارة، الطالبة المتفوقة، بالانضمام إلى النادي.",
+1:"أميرة، رئيسة النادي، تنتظرك عند الركن بابتسامة عريضة.",
+2:"سارة عقل لامع: الأولى على دفعتها في الفيزياء. لكنها ترفض كل الدعوات. علينا أن نقنعها… باحترام. هل تساعدني؟",
+3:"على مسافة قريبة، تقرأ سارة كتابًا وسماعاتها في أذنيها، وكأنها تقول: «لا تزعجوني».",
+4:["كيف تقترب منها؟",["«مرحبًا سارة! نتائجك في الفيزياء مدهشة. هل تعرفين نادي النهضة؟»","المجاملة الصادقة تفتح الحوار."],["«انضمي إلينا، الأمر رائع، الكل يأتي!»"]],
+5:"شخص آخر يبيعني نادي… لا شكرًا، ليس لدي وقت أضيعه.",
+6:"على مهلك… عذرًا يا سارة. قولي لنا فقط ما رأيك في النوادي.",
+7:"بصراحة؟ النوادي كلام فارغ وصور في الغالب. أفضّل أن أدرس وحدي.",
+8:["ترى سارة أن النادي مضيعة للوقت. أي حجة تختار؟",["«في النادي نجري تجارب حقيقية لا تُريكها الدروس. وهي مفيدة في السيرة الذاتية.»","فائدة ملموسة ترد على اعتراضها."],["«سترين، إنه ممتع.»"]],
+9:"تجارب حقيقية؟ …حسنًا، هذا يهمّني قليلًا.",
+10:"«ممتع» لا تعني شيئًا.",
+11:"ثم إنني خجولة نوعًا ما. لم أعرض شيئًا أمام الناس من قبل.",
+12:"سأفكر. قابلوني غدًا أمام المكتبة.",
+13:"في المساء، في غرفتها، تستعيد سارة يومها. والنادي لا يغادر ذهنها.",
+14:"نادٍ علمي… ماذا لو لم أكن بمستوى؟ الآخرون يعرفون كل شيء على الأرجح.",
+15:"أنا جيدة في الكتب. لكن في مختبر حقيقي، مع أشخاص؟ سأبدو عديمة الفائدة.",
+16:"وماذا لو مللت؟ سأفقد ساعات مراجعة. لكن… ماذا لو كان شيقًا؟",
+17:["لماذا يتردد الناس في الانضمام إلى نادٍ؟",["الخوف من ألّا يكونوا بمستوى كافٍ.","الخجل: لا يعرفون أحدًا.","الخوف من ضياع وقت الدراسة.","لا يعرفون ما يُفعل فيه حقًا.","جرّبوا من قبل نادٍ مملًا."],"عندما تفهم ما يعيق الآخر، يمكنك الرد على السبب الحقيقي."],
+18:"اليوم التالي، آخر النهار. سارة هناك أصلًا، تضم كتابها إلى صدرها.",
+19:"شكرًا لأنك أتيتِ يا سارة.",
+20:"فكرت. لكن لدي شكوك: لست متأكدة أنني بالمستوى، ولا أريد إضاعة وقتي.",
+21:["بماذا ترد؟",["«أتفهم. في النادي لا أحد خبير في البداية: نتعلم معًا، كلٌّ بإيقاعه.»","الطمأنة ترد على الخوف الحقيقي."],["«أنتِ الأفضل في دفعتك، لا سبب للخوف.»","المجاملة تساعد، لكنها لا تُصغي إلى الخوف."],["«إن لم تأتي، فهذه مشكلتك.»","الضغط يغلق الباب."]],
+22:"…هذا يطمئنني. كنت أخاف أن أكون الوحيدة التي لا تعرف شيئًا.",
+23:"لطيف منك، لكن التفوق في الدروس لا يعني أنني سأفيد في مشروع.",
+24:"واو. هذا بالضبط سبب كرهي للنوادي.",
+25:"آسفة يا سارة. قصد فقط أن الباب يبقى مفتوحًا.",
+26:"تعالي لترَي ما نفعله فعلًا. يوم السبت نبني روبوتًا صغيرًا ونجرّب مستشعرًا شمسيًا. تعالي للمشاهدة فقط.",
+27:"أهلًا بك يا سارة. أنا الأستاذ كريم، مستشار النادي. هنا يحق لك أن تخطئي: هكذا نكتشف.",
+28:"وماذا لو لم أعرف كيف أفعل؟",
+29:"حينها تسألين. الأعضاء القدامى يساعدون الجدد، ونتقاسم المهام.",
+30:"تنظر سارة إلى الروبوت والمستشعرات والمخططات… وتلمع عيناها رغمًا عنها.",
+31:"انظري إلى هذين المسارين. الطالبة نفسها، لكن اختياران مختلفان.",
+33:"لست أموهبة منك يا سارة. فقط تجرأت وجئت في اليوم الأول.",
+34:"وأنت أصغيت بدل أن تفرض عليها. لنرَ ما تذكّرته: صح أم خطأ؟",
+35:["لإقناع شخص ما، يجب أن تتحدث كثيرًا عن نفسك أولًا.","خطأ. الإصغاء أولًا يساعد على فهم أسباب تردده الحقيقية."],
+36:["المجاملة الصادقة تساعد على بناء الثقة.","صح. بشرط أن تكون صادقة ومحددة."],
+37:["إجبار شخص على الحضور ينجح دائمًا.","خطأ. الضغط يولّد الرفض. الأفضل أن تقترح وتترك له الاختيار."],
+38:["يجب أن تكون خبيرًا لتدخل نادٍ علميًا.","خطأ. النادي موجود بالضبط لنتعلم مع الآخرين."],
+39:["ما يمنحك إياه نادي النهضة",["مشاريع ملموسة: روبوتات، طاقة شمسية، كيمياء، برمجة.","مهارات مفيدة: العمل الجماعي، التحدث أمام الجمهور، الدقة.","شبكة علاقات: زملاء، قدامى، أساتذة.","مسابقات ومعارض وأيام علمية.","مكان نتعلم فيه بالتجربة، حتى بالخطأ."],"الانضمام إلى النهضة ليس إضاعة للوقت: إنه تعلّم بطريقة مختلفة."],
+40:"لتقنع أنت بدورك، إليك طريقة من أربع خطوات.",
+41:[["1 · أصغِ","دع الآخر يقول ما يعيقه، دون مقاطعة ولا تصنيف."],["2 · افهم","اكتشف السبب الحقيقي للرفض: خوف، ضيق وقت، شك، نقص معلومات."],["3 · أجب","قدّم فائدة ملموسة ومثالًا، لا شعارًا."],["4 · ادعُ","اقترح خطوة أولى بسيطة (حصة تجريبية) واترك الشخص يختار بحرية."]],
+42:"سارة، القرار قرارك. ما رأيك؟",
+44:"سأسجّل. شكرًا لأنكم لم تجبروني: ولهذا قلت نعم.",
+45:"أهلًا بك في النهضة يا سارة.",
+46:"بعد أشهر، تعرض سارة مشروعها الأول أمام الكلية كلها: مستشعر شمسي منخفض التكلفة. وهي أول من يدعو الوافدين الجدد.",
+47:"كنت أخاف أن أضيّع وقتي. لم أتعلم يومًا بقدر ما تعلمت الآن.",
+48:"وفي المرة القادمة، ستكون أنت من يقنع شخصًا آخر.",
+50:"حسنًا… سآتي إلى حصة تجريبية. لا أكثر، حاليًا.",
+51:"هذه أصلًا خطوة أولى جميلة جدًا.",
+52:"تحضر سارة حصتين، ما زالت متردة، ثم تنجذب إلى الأجواء. ستسجّل قبل نهاية الشهر.",
+53:"خطوة بعد خطوة. ولن نستسلم.",
+55:"شكرًا، لكن لا. أفضّل البقاء وحدي مع دروسي.",
+56:"أحترم قرارك. باب النادي يبقى مفتوحًا.",
+57:"تبتعد سارة. لم يحدث شجار، لكن لم تحدث شرارة أيضًا.",
+58:"ربما تكلمنا كثيرًا وأصغينا قليلًا. في المرة القادمة سنبدأ بالإصغاء.",
+59:"ليست كارثة: يمكن المحاولة مجددًا بطريقة مختلفة. لكن هذه المرة، لم يكسب النادي باحثة المستقبل."}}
+};
+const UI={
+fr:{doc:"Rejoins Ennahdha — Visual Novel du club scientifique",kick:"Club scientifique · Université",ttl:"Rejoins<br>Ennahdha",sub:"Une visual novel interactive : convaincre une étudiante brillante mais hésitante de rejoindre le club scientifique de l'université.",start:"Commencer",how:"Comment jouer · À propos",lc:"FR",tLog:"Journal des dialogues",tSnd:"Son / musique",tFs:"Plein écran",tInfo:"Aide et informations",tLang:"Langue",close:"Fermer",cont:"Continuer",tf:"Vrai ou faux",t:"Vrai",f:"Faux",quiz:"Quiz : ",right:"juste",wrong:"raté",bravo:"Bravo ! ",notq:"Pas tout à fait. ",auto:"Méthode",prev:"← Précédent",nextb:"Suivant →",fin:"Terminer",autoD:"Convaincre, c'est d'abord écouter.",
+cmpT:"Deux parcours, une seule différence : le choix du club",cmpAn:"Sara · rejoint Ennahdha",cmpNn:"Sara · reste seule",
+cmpA:[["Semaine 1","Elle essaie une séance d'essai."],["Mois 1","Elle réalise sa première expérience en équipe."],["Mois 3","Elle présente un projet devant la faculté."],["Ensuite","Concours, rencontres, confiance en soi."],["Aujourd'hui","Elle invite d'autres étudiants à venir."]],
+cmpN:[["Semaine 1","Elle étudie seule, comme d'habitude."],["Mois 1","Elle maîtrise les cours mais jamais la pratique."],["Mois 3","Elle voit les affiches du club sans oser venir."],["Ensuite","Moins d'occasions de pratiquer et de rencontrer."],["Aujourd'hui","Elle se demande ce qu'elle a manqué."]],
+cmpF:"Histoires fictives, inspirées de situations réelles.",narr:"Narration",lang:"Choisir la langue",logE:"Rien pour l'instant.",logT:"Journal",
+eA:["Fin A","Elle rejoint Ennahdha","Tu as su écouter, comprendre et inviter sans forcer. Grâce à toi, Sara a rejoint le club avec enthousiasme."],
+eB:["Fin B","Un pas après l'autre","Sara a accepté un essai. Ton approche a ouvert la porte : il reste à la convaincre pas à pas."],
+eC:["Fin C","Pas cette fois","Sara a dit non. Tu as parlé plus que tu n'as écouté : le club n'a pas gagné une nouvelle membre… pour l'instant."],
+score:"Score de persuasion",stat:"Un club, c'est apprendre en pratiquant, travailler en équipe et rencontrer des gens aussi curieux que toi.",statC:"Un « non » aujourd'hui n'est pas définitif : en changeant d'approche, on peut convaincre demain.",
+keepT:"À retenir",keep:["👂 <b>Écoute</b> avant de parler.","🧭 <b>Trouve la vraie raison</b> du refus : peur, temps, doute, information.","💡 <b>Réponds</b> avec un bénéfice concret et un exemple.","🤝 <b>Propose un premier pas simple</b>, comme une séance d'essai.","🚪 <b>Respecte</b> la décision : la porte reste ouverte."],
+whyT:"Pourquoi cette fin ? Ce qui a manqué",
+why:["🗣️ <b>Trop de paroles</b> : Sara n'a pas été vraiment écoutée.","😟 <b>Les vraies peurs sont restées sans réponse</b> : niveau, temps, timidité.","⚠️ <b>De la pression</b> au lieu d'une invitation libre.","🚪 <b>Aucun premier pas simple</b> n'a été proposé."],
+whyF:"Convaincre, ce n'est pas gagner une discussion : c'est comprendre l'autre et lui proposer un premier pas qu'il choisit librement.",
+replay:"↺ Rejouer",about:"À propos",disc:"Cette histoire est une fiction. Projet étudiant — Club scientifique Ennahdha",dev:"Développé par",infoT:"Comment jouer",
+info:`<ul><li>Clique (ou touche <b>Espace / Entrée</b>) pour faire avancer le dialogue.</li><li>Tes <b>choix</b> comptent : ils changent la fin (3 fins possibles). Touches 1 / 2 / 3 pour choisir.</li><li>Réponds au quiz pour gagner des points de persuasion.</li><li>Boutons en haut : journal, langue, son, plein écran.</li></ul><div class="foot">Histoire fictive créée pour présenter le club scientifique Ennahdha et apprendre à convaincre avec respect.</div>`},
+en:{doc:"Join Ennahdha — Scientific Club Visual Novel",kick:"Scientific club · University",ttl:"Join<br>Ennahdha",sub:"An interactive visual novel: convince a brilliant but hesitant student to join the university's scientific club.",start:"Start",how:"How to play · About",lc:"EN",tLog:"Dialogue log",tSnd:"Sound / music",tFs:"Fullscreen",tInfo:"Help and information",tLang:"Language",close:"Close",cont:"Continue",tf:"True or false",t:"True",f:"False",quiz:"Quiz: ",right:"correct",wrong:"missed",bravo:"Well done! ",notq:"Not quite. ",auto:"Method",prev:"← Previous",nextb:"Next →",fin:"Finish",autoD:"Convincing starts with listening.",
+cmpT:"Two paths, one difference: the choice of the club",cmpAn:"Sara · joins Ennahdha",cmpNn:"Sara · stays alone",
+cmpA:[["Week 1","She tries a trial session."],["Month 1","She does her first experiment in a team."],["Month 3","She presents a project in front of the faculty."],["Then","Competitions, meetings, self-confidence."],["Today","She invites other students to come."]],
+cmpN:[["Week 1","She studies alone, as usual."],["Month 1","She masters the lessons but never the practice."],["Month 3","She sees the club posters but doesn't dare come."],["Then","Fewer chances to practice and meet people."],["Today","She wonders what she missed."]],
+cmpF:"Fictional stories, inspired by real situations.",narr:"Narration",lang:"Choose a language",logE:"Nothing yet.",logT:"Log",
+eA:["End A","She joins Ennahdha","You listened, understood and invited without forcing. Thanks to you, Sara joined the club enthusiastically."],
+eB:["End B","One step at a time","Sara agreed to a trial. Your approach opened the door: now you have to convince her step by step."],
+eC:["End C","Not this time","Sara said no. You talked more than you listened: the club didn't gain a new member… for now."],
+score:"Persuasion score",stat:"A club means learning by doing, working in a team and meeting people as curious as you.",statC:"A “no” today isn't final: by changing approach, you can convince tomorrow.",
+keepT:"Key takeaways",keep:["👂 <b>Listen</b> before you speak.","🧭 <b>Find the real reason</b> for the refusal: fear, time, doubt, information.","💡 <b>Answer</b> with a concrete benefit and an example.","🤝 <b>Suggest a simple first step</b>, like a trial session.","🚪 <b>Respect</b> the decision: the door stays open."],
+whyT:"Why this ending? What was missing",
+why:["🗣️ <b>Too much talking</b>: Sara wasn't really listened to.","😟 <b>Real fears went unanswered</b>: level, time, shyness.","⚠️ <b>Pressure</b> instead of a free invitation.","🚪 <b>No simple first step</b> was offered."],
+whyF:"Convincing isn't winning an argument: it's understanding the other person and offering a first step they choose freely.",
+replay:"↺ Play again",about:"About",disc:"This story is fiction. Student project — Ennahdha Scientific Club",dev:"Developed by",infoT:"How to play",
+info:`<ul><li>Click (or press <b>Space / Enter</b>) to advance the dialogue.</li><li>Your <b>choices</b> matter: they change the ending (3 possible endings). Press 1 / 2 / 3 to choose.</li><li>Answer the quiz to earn persuasion points.</li><li>Top buttons: log, language, sound, fullscreen.</li></ul><div class="foot">Fictional story created to present the Ennahdha scientific club and to learn how to convince with respect.</div>`},
+ar:{doc:"انضم إلى النهضة — رواية بصرية لنادي علمي",kick:"نادٍ علمي · الجامعة",ttl:"انضمّ إلى<br>النهضة",sub:"رواية بصرية تفاعلية: أقنع طالبة متفوقة لكنها مترددة بالانضمام إلى النادي العلمي للجامعة.",start:"ابدأ",how:"طريقة اللعب · حول",lc:"عربي",tLog:"سجل الحوارات",tSnd:"الصوت / الموسيقى",tFs:"ملء الشاشة",tInfo:"مساعدة ومعلومات",tLang:"اللغة",close:"إغلاق",cont:"متابعة",tf:"صح أم خطأ",t:"صح",f:"خطأ",quiz:"اختبار: ",right:"صحيح",wrong:"خطأ",bravo:"أحسنت! ",notq:"ليس تمامًا. ",auto:"الطريقة",prev:"→ السابق",nextb:"التالي ←",fin:"إنهاء",autoD:"الإقناع يبدأ بالإصغاء.",
+cmpT:"مساران، فرق واحد: اختيار النادي",cmpAn:"سارة · تنضم إلى النهضة",cmpNn:"سارة · تبقى وحدها",
+cmpA:[["الأسبوع 1","تجرّب حصة تجريبية."],["الشهر 1","تنجز أول تجربة ضمن فريق."],["الشهر 3","تعرض مشروعًا أمام الكلية."],["بعد ذلك","مسابقات ولقاءات وثقة بالنفس."],["اليوم","تدعو طلابًا آخرين للحضور."]],
+cmpN:[["الأسبوع 1","تدرس وحدها كالعادة."],["الشهر 1","تتقن الدروس لكن ليس التطبيق."],["الشهر 3","ترى ملصقات النادي ولا تجرؤ على الحضور."],["بعد ذلك","فرص أقل للتطبيق وللقاء الناس."],["اليوم","تتساءل عمّا فاتها."]],
+cmpF:"قصص خيالية مستوحاة من مواقف حقيقية.",narr:"السرد",lang:"اختر اللغة",logE:"لا شيء حتى الآن.",logT:"السجل",
+eA:["النهاية أ","تنضم إلى النهضة","أصغيت وفهمت ودعوت دون إجبار. بفضلك انضمّت سارة إلى النادي بحماس."],
+eB:["النهاية ب","خطوة بعد خطوة","وافقت سارة على تجربة. أسلوبك فتح الباب: بقي أن تقنعها خطوة بعد خطوة."],
+eC:["النهاية ج","ليس هذه المرة","قالت سارة لا. تحدثت أكثر مما أصغيت: لم يكسب النادي عضوة جديدة… حاليًا."],
+score:"درجة الإقناع",stat:"النادي يعني التعلم بالممارسة، والعمل الجماعي، ولقاء أشخاص فضوليين مثلك.",statC:"«لا» اليوم ليست نهائية: بتغيير الأسلوب يمكنك الإقناع غدًا.",
+keepT:"ما يجب تذكّره",keep:["👂 <b>أصغِ</b> قبل أن تتكلم.","🧭 <b>اكتشف السبب الحقيقي</b> للرفض: خوف، وقت، شك، معلومات.","💡 <b>أجب</b> بفائدة ملموسة ومثال.","🤝 <b>اقترح خطوة أولى بسيطة</b> مثل حصة تجريبية.","🚪 <b>احترم</b> القرار: الباب يبقى مفتوحًا."],
+whyT:"لماذا هذه النهاية؟ ما الذي نقص",
+why:["🗣️ <b>كلام كثير</b>: لم يُصغَ إلى سارة حقًا.","😟 <b>المخاوف الحقيقية بقيت بلا جواب</b>: المستوى، الوقت، الخجل.","⚠️ <b>ضغط</b> بدل دعوة حرة.","🚪 <b>لم تُقترح أي خطوة أولى بسيطة</b>."],
+whyF:"الإقناع ليس الفوز في نقاش: إنه فهم الآخر واقتراح خطوة أولى يختارها بحرية.",
+replay:"↺ أعد اللعب",about:"حول",disc:"هذه القصة خيالية. مشروع طلابي — نادي النهضة العلمي",dev:"تطوير",infoT:"طريقة اللعب",
+info:`<ul><li>انقر (أو اضغط <b>Space / Enter</b>) لمتابعة الحوار.</li><li><b>اختياراتك</b> مهمة: فهي تغيّر النهاية (3 نهايات ممكنة). اضغط 1 / 2 / 3 للاختيار.</li><li>أجب عن الاختبار لتكسب نقاط الإقناع.</li><li>الأزرار في الأعلى: السجل، اللغة، الصوت، ملء الشاشة.</li></ul><div class="foot">قصة خيالية أُنشئت لتقديم نادي النهضة العلمي ولتعلّم الإقناع باحترام.</div>`}
+};
+const u=k=>{const v=UI[lang]&&UI[lang][k];return v===undefined?UI.fr[k]:v;};
+const S=n=>lang==='fr'?null:((I18N[lang]||{}).S||{})[n._i];
+const chL=n=>lang==='fr'?n.ch:(((I18N[lang]||{}).H||{})[n._i]||n.ch);
+function tr(n){const e=S(n);return e?(typeof e==='string'?e:e[0]):n.t;}
+function ctr(k){const e=S(cur),c=cur.choices[k],x=e&&e[k+1];return x?[x[0],x[1]||c.fb]:[c.t,c.fb];}
+const phone=(a,b)=>'<bdi dir="ltr">'+a+'</bdi> | <bdi dir="ltr">'+b+'</bdi>';
+function credits(){return '<div class="cr"><b>'+u('dev')+' :</b><span>Nabil HAMMOUM<br>'+phone('+213 553 02 15 49','nabilhammoum8@gmail.com')+'</span><span>Amrane AHMED ALI<br>'+phone('+213 542 51 29 70','contact.amrane@gmail.com')+'</span><em dir="ltr">All rights reserved © 2026</em></div>';}
+
+/* ---------- AUDIO ---------- */
+let audio=null,master=null,musicTimer=null,soundOn=true,ci=0;
+function ac(){
+  if(!audio){try{audio=new (window.AudioContext||window.webkitAudioContext)();master=audio.createGain();master.gain.value=soundOn?1:0;master.connect(audio.destination);}catch(e){}}
+  if(audio&&audio.state==='suspended')audio.resume();
+  return audio;
+}
+function tone(f,t,d,g,type){const a=ac();if(!a)return;const o=a.createOscillator(),v=a.createGain();o.type=type||'sine';o.frequency.value=f;v.gain.setValueAtTime(.0001,t);v.gain.linearRampToValueAtTime(g,t+Math.min(.04,d/3));v.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(v);v.connect(master);o.start(t);o.stop(t+d+.05);}
+function pad(f,t,d,g){const a=ac();if(!a)return;const o=a.createOscillator(),v=a.createGain();o.type='sine';o.frequency.value=f;v.gain.setValueAtTime(.0001,t);v.gain.linearRampToValueAtTime(g,t+2);v.gain.linearRampToValueAtTime(.0001,t+d);o.connect(v);v.connect(master);o.start(t);o.stop(t+d+.1);}
+const CH=[[110,220,261.63,329.63],[87.31,174.61,220,261.63],[130.81,261.63,329.63,392],[98,196,246.94,293.66]];
+function startMusic(){
+  if(musicTimer||!ac())return;
+  const play=()=>{const t=audio.currentTime+.05,c=CH[ci%4];c.forEach(f=>pad(f,t,7,.022));[0,1.25,2.5,3.75].forEach((o,k)=>tone(c[1+(k%3)]*2,t+o+.2,2.2,.012,'triangle'));ci++;};
+  play();musicTimer=setInterval(play,5600);
+}
+function sfx(k){const a=ac();if(!a)return;const t=a.currentTime;
+  if(k==='pop'){tone(660,t,.18,.06);tone(880,t+.08,.2,.05);}
+  if(k==='chime'){[523,659,784].forEach((f,j)=>tone(f,t+j*.12,.6,.05));}
+  if(k==='ok'){tone(784,t,.25,.06);tone(988,t+.1,.4,.06);}
+  if(k==='ko'){tone(247,t,.4,.07,'triangle');tone(196,t+.15,.5,.06,'triangle');}
+}
+
+/* ---------- PERSONNAGES (SVG) ---------- */
+const SKIN={nour:['#f2c6a5','#e3ac86'],amira:['#ebbf9a','#d9a47c'],doc:['#dba982','#c58f66']};
+const RIB=(x,y,s)=>`<g transform="translate(${x} ${y}) scale(${s||1})"><path d="M0 -14 C-12 -32 -30 -14 -12 0 L10 26 M0 -14 C12 -32 30 -14 12 0 L-10 26" stroke="#ff4fa3" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+function char(id,emo,fl){
+  emo=emo||'neutral';fl=fl||'';
+  const [sk,sd]=SKIN[id],ink='#2a1810';
+  const brow={neutral:['M110 176 Q124 171 138 176','M162 176 Q176 171 190 176'],happy:['M110 172 Q124 165 138 172','M162 172 Q176 165 190 172'],sad:['M108 182 Q124 176 138 167','M162 167 Q176 176 192 182'],worried:['M109 178 Q124 174 138 168','M162 168 Q176 174 191 178'],serious:['M110 170 L138 178','M162 178 L190 170'],surprised:['M110 163 Q124 156 138 163','M162 163 Q176 156 190 163']};
+  const bm={neutral:'neutral',happy:'happy',smile:'happy',sad:'sad',cry:'sad',worried:'worried',serious:'serious',surprised:'surprised'}[emo]||'neutral';
+  const bc=id==='doc'?'#1f1a1a':id==='nour'?'#2a1710':'#3a2a22';
+  const brows=`<g stroke="${bc}" stroke-width="${id==='doc'?5:3.6}" fill="none" stroke-linecap="round"><path d="${brow[bm][0]}"/><path d="${brow[bm][1]}"/></g>`;
+  const eye=cx=>{
+    if(emo==='happy')return `<path d="M${cx-10} 202 Q${cx} 189 ${cx+10} 202" stroke="${ink}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+    const ry=emo==='surprised'?12.5:(emo==='sad'||emo==='cry')?9:10.5,pr=emo==='surprised'?4:5.6;
+    return `<g class="eye"><ellipse cx="${cx}" cy="198" rx="9.8" ry="${ry}" fill="#fff"/><circle cx="${cx}" cy="199" r="${pr}" fill="#3b2417"/><circle cx="${cx}" cy="199" r="${pr*.55}" fill="#120a06"/><circle cx="${cx+2}" cy="196" r="1.9" fill="#fff"/><path d="M${cx-10.5} 189 Q${cx} 184.5 ${cx+10.5} 189" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/></g>`;
+  };
+  const ln='stroke="#8b3a3a" stroke-width="3.5" fill="none" stroke-linecap="round"';
+  const M={neutral:`<path d="M138 243 Q150 246 162 243" ${ln}/>`,
+    smile:`<path d="M133 238 Q150 253 167 238" ${ln}/>`,
+    happy:`<path d="M131 236 Q150 266 169 236 Q150 244 131 236Z" fill="#8b2e3a"/><path d="M139 249 Q150 256 161 249 Q150 253 139 249Z" fill="#ff8fa3"/>`,
+    sad:`<path d="M137 249 Q150 237 163 249" ${ln}/>`,
+    worried:`<path d="M138 247 Q150 241 162 247" ${ln}/>`,
+    serious:`<path d="M139 244 L161 244" ${ln}/>`,
+    surprised:`<ellipse cx="150" cy="247" rx="7" ry="9" fill="#7a2631"/>`};
+  M.cry=M.sad;
+  const blush=`<ellipse cx="112" cy="224" rx="12" ry="7" fill="#ff7b9c" opacity="${(emo==='happy'||emo==='smile')?.38:.2}"/><ellipse cx="188" cy="224" rx="12" ry="7" fill="#ff7b9c" opacity="${(emo==='happy'||emo==='smile')?.38:.2}"/>`;
+  const nose=`<path d="M148 212 Q146 222 153 223" stroke="${sd}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+  const tears=emo==='cry'?`<path class="tear" d="M121 212 q-5 9 0 13 q5 -4 0 -13z" fill="#8fd3ff"/><path class="tear t2" d="M179 212 q-5 9 0 13 q5 -4 0 -13z" fill="#8fd3ff"/>`:'';
+  const feat=blush+nose+brows+eye(125)+eye(175)+`<g class="mouth">${M[emo]||M.neutral}</g>`+tears;
+  const ears=`<circle cx="88" cy="206" r="11" fill="${sk}"/><circle cx="212" cy="206" r="11" fill="${sk}"/>`;
+  const neck=`<path d="M126 262 L126 340 Q150 362 174 340 L174 262Z" fill="${sd}"/>`;
+  const head=`<ellipse cx="150" cy="200" rx="62" ry="72" fill="${sk}"/>`;
+  let back='',body='',front='',glasses='';
+  if(id==='nour'){
+    back=`<path d="M82 205 C58 95 112 48 150 48 C190 48 244 95 218 205 L240 392 C200 410 100 410 60 392Z" fill="#2a1710"/>`;
+    body=`<path d="M18 520 C18 405 58 348 118 332 L182 332 C242 348 282 405 282 520Z" fill="#e0a64f"/><path d="M105 335 Q150 372 195 335 L205 330 Q150 395 95 330Z" fill="#c98a32"/><path d="M130 362 L128 412 M170 362 L172 412" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`+(fl==='ribbon'?RIB(96,448,1.1):'');
+    front=`<path d="M86 200 C78 108 124 72 152 74 C196 74 224 112 214 200 C206 160 190 126 150 120 C118 124 98 150 86 200Z" fill="#2a1710"/><path d="M120 100 Q150 86 185 104" stroke="#52301f" stroke-width="4" fill="none" opacity=".7" stroke-linecap="round"/><path d="M86 206 C66 270 70 345 84 408 C104 372 110 290 100 222Z" fill="#2a1710"/><path d="M214 206 C234 270 230 345 216 408 C196 372 190 290 200 222Z" fill="#2a1710"/>`;
+  }
+  if(id==='amira'){
+    body=`<path d="M18 520 C18 405 58 348 118 332 L182 332 C242 348 282 405 282 520Z" fill="#f6ebdd"/>`+RIB(98,462,1.15);
+    front=`<path fill-rule="evenodd" d="M150 40 C92 40 60 98 64 190 C66 262 58 340 20 402 Q150 444 280 402 C242 340 234 262 236 190 C240 98 208 40 150 40Z M150 128 C114 128 96 160 96 200 C96 248 120 276 150 276 C180 276 204 248 204 200 C204 160 186 128 150 128Z" fill="#7c6bd6"/><path d="M110 70 Q150 50 195 78" stroke="#a89ef2" stroke-width="5" fill="none" opacity=".7" stroke-linecap="round"/><path d="M72 250 C90 330 62 384 38 402 M228 250 C210 330 238 384 262 402" stroke="#5f4fb8" stroke-width="3" fill="none" opacity=".55"/>`;
+  }
+  if(id==='doc'){
+    body=`<path d="M12 520 C12 400 55 345 118 330 L182 330 C245 345 288 400 288 520Z" fill="#f8fafc"/><path d="M120 330 L150 424 L180 330 Q150 352 120 330Z" fill="#2aa5a0"/><path d="M118 330 L98 440 L150 404Z M182 330 L202 440 L150 404Z" fill="#e3e8f0"/><path d="M112 336 C98 402 120 446 150 446 C180 446 202 402 188 336" stroke="#3b3b4a" stroke-width="5" fill="none"/><circle cx="150" cy="452" r="11" fill="#9ca3af" stroke="#3b3b4a" stroke-width="3"/>`+RIB(222,430,1);
+    front=`<path d="M86 190 C80 100 120 66 152 66 C190 66 222 100 214 190 C208 150 196 118 150 112 C112 116 94 150 86 190Z" fill="#1f1a1a"/><path d="M86 190 C88 160 94 146 100 138 L104 168Z M214 190 C212 160 206 146 200 138 L196 168Z" fill="#8b8b95"/>`;
+    glasses=`<g fill="#bfe8ff" fill-opacity=".14" stroke="#2f2f3a" stroke-width="3"><rect x="103" y="184" width="45" height="30" rx="12"/><rect x="152" y="184" width="45" height="30" rx="12"/></g><path d="M148 196 Q150 192 152 196 M103 192 L90 188 M197 192 L210 188" stroke="#2f2f3a" stroke-width="3" fill="none"/>`;
+  }
+  const dly={nour:0,amira:-1.7,doc:-3.1}[id];
+  return `<svg viewBox="0 0 300 520" xmlns="http://www.w3.org/2000/svg" style="--d:${dly}s"><g class="all" style="animation-delay:${dly}s">${back}${body}${neck}${ears}${head}${feat}${glasses}${front}</g></svg>`;
+}
+
+/* ---------- DÉCORS ---------- */
+function campus(v){
+  const P={
+    day:{s1:'#8fd3ff',s2:'#ffe2ee',sun:'#fff6c9',sx:1280,sy:190,b:'#f4e4d4',b2:'#e0c9b3',w:'#78a9d8',t1:'#3f9a62',t2:'#58b878',g:'#9fd8a2',p:'#eadcca',ov:0,fest:1},
+    eve:{s1:'#2f2a66',s2:'#f7a072',sun:'#ffd08a',sx:1250,sy:520,b:'#b79bb0',b2:'#8a6f8f',w:'#ffd27a',t1:'#25514f',t2:'#2f6a60',g:'#466a58',p:'#7d6c6a',ov:.12,fest:1,bench:1},
+    dawn:{s1:'#fdb9d4',s2:'#fff0c4',sun:'#fff8d6',sx:800,sy:470,b:'#f8e9df',b2:'#e8d0c0',w:'#9fcdf0',t1:'#4ea96e',t2:'#6cc48a',g:'#b2e3ae',p:'#f1e4d2',ov:0,fest:1},
+    grey:{s1:'#7f869c',s2:'#c9ccd8',sun:'#e7e9f0',sx:1250,sy:220,b:'#aeacba',b2:'#8e8c9e',w:'#c5cde2',t1:'#4b665f',t2:'#5c7a72',g:'#7b9387',p:'#a8a2a0',ov:.1,fest:0,bench:1}
+  }[v];
+  const tree=(x,y,s)=>`<g transform="translate(${x} ${y}) scale(${s})"><rect x="-14" y="-10" width="28" height="130" rx="8" fill="#6b4a3a"/><circle cx="0" cy="-70" r="80" fill="${P.t1}"/><circle cx="-60" cy="-30" r="58" fill="${P.t2}"/><circle cx="62" cy="-34" r="60" fill="${P.t1}"/><circle cx="6" cy="-120" r="54" fill="${P.t2}"/></g>`;
+  let cols='',wins='';
+  for(let k=0;k<8;k++)cols+=`<rect x="${360+k*100}" y="382" width="34" height="318" fill="#fff" opacity=".5"/>`;
+  for(let k=0;k<7;k++)wins+=`<rect x="${413+k*100}" y="412" width="36" height="120" rx="5" fill="${P.w}"/><rect x="${413+k*100}" y="560" width="36" height="90" rx="5" fill="${P.w}"/>`;
+  let bunt='';
+  if(P.fest){for(let k=0;k<22;k++){const x=k*76+20,y=70+46*Math.sin(Math.PI*x/1600);bunt+=`<path d="M${x} ${y} l34 0 l-17 32z" fill="${k%2?'#fff':'#2f6fed'}" opacity=".95"/>`;}
+    bunt=`<path d="M0 70 Q800 150 1600 70" stroke="#fff" stroke-width="3" fill="none" opacity=".8"/>`+bunt;}
+  let stripes='';for(let k=0;k<8;k++){const x0=k*40;stripes+=`<path d="M${x0} 0 H${x0+40} L${x0+46} 56 Q${x0+23} 70 ${x0-6} 56Z" fill="${k%2?'#fff':'#2f6fed'}"/>`;}
+  const stand=P.fest?`<g transform="translate(1190 500)"><rect x="4" y="0" width="6" height="250" fill="#8a6f8f"/><rect x="310" y="0" width="6" height="250" fill="#8a6f8f"/>${stripes}<rect x="10" y="160" width="300" height="12" fill="#fff"/><rect x="14" y="172" width="292" height="80" fill="#9cc3ff"/>${RIB(160,214,1.3)}<circle cx="-14" cy="36" r="22" fill="#2f6fed"/><circle cx="332" cy="40" r="22" fill="#9cc3ff"/><circle cx="350" cy="14" r="19" fill="#fff"/></g>`:'';
+  const banner=P.fest?`<g><rect x="500" y="130" width="600" height="84" rx="18" fill="#2f6fed" opacity=".96"/><text x="800" y="188" text-anchor="middle" font-size="44" font-weight="800" fill="#fff" font-family="Segoe UI,Arial,sans-serif" letter-spacing="6">ENNAHDHA</text>${RIB(540,172,.8)}${RIB(1060,172,.8)}</g>`:'';
+  const bench=P.bench?`<g transform="translate(120 700)"><rect x="0" y="40" width="300" height="16" rx="4" fill="#6b4a3a"/><rect x="0" y="0" width="300" height="12" rx="4" fill="#6b4a3a"/><rect x="0" y="16" width="300" height="12" rx="4" fill="#6b4a3a"/><rect x="20" y="56" width="12" height="70" fill="#3a2a2a"/><rect x="268" y="56" width="12" height="70" fill="#3a2a2a"/></g>`:'';
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sk${v}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.s1}"/><stop offset="1" stop-color="${P.s2}"/></linearGradient><radialGradient id="sn${v}"><stop offset="0" stop-color="${P.sun}" stop-opacity=".95"/><stop offset="1" stop-color="${P.sun}" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1600" height="900" fill="url(#sk${v})"/><circle cx="${P.sx}" cy="${P.sy}" r="280" fill="url(#sn${v})"/><circle cx="${P.sx}" cy="${P.sy}" r="56" fill="${P.sun}"/>
+  <path d="M0 650 Q300 560 600 630 T1200 610 T1600 640 L1600 900 L0 900Z" fill="${P.t2}" opacity=".45"/>
+  <g><rect x="330" y="360" width="800" height="340" fill="${P.b}"/><polygon points="300,360 730,230 1160,360" fill="${P.b2}"/><circle cx="730" cy="316" r="30" fill="#fff" opacity=".9"/><path d="M730 316 V298 M730 316 L744 322" stroke="${P.b2}" stroke-width="4" stroke-linecap="round"/><rect x="330" y="360" width="800" height="22" fill="${P.b2}"/>${cols}${wins}<rect x="696" y="590" width="70" height="110" rx="6" fill="${P.b2}"/><rect x="300" y="700" width="860" height="22" fill="${P.b2}"/><rect x="270" y="722" width="920" height="22" fill="${P.b2}" opacity=".85"/></g>
+  <rect y="744" width="1600" height="156" fill="${P.g}"/><path d="M540 900 L920 900 L800 744 L660 744Z" fill="${P.p}"/>
+  ${tree(110,700,1.35)}${tree(1500,700,1.2)}${tree(270,730,.8)}${bench}${stand}${banner}${bunt}
+  <rect width="1600" height="900" fill="#1a0f3a" opacity="${P.ov}"/></svg>`;
+}
+function bedroom(){
+  let stars='';[[1080,190],[1150,240],[1300,170],[1340,310],[1100,400],[1210,430],[1270,500],[1060,300]].forEach(p=>stars+=`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="#fff" opacity=".85"/>`);
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1b3d"/><stop offset="1" stop-color="#2d2250"/></linearGradient><radialGradient id="glow"><stop offset="0" stop-color="#ffb35c" stop-opacity=".55"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1600" height="900" fill="url(#bw)"/>
+  <rect x="1020" y="140" width="360" height="420" rx="18" fill="#0f1738" stroke="#6b5b95" stroke-width="10"/>${stars}
+  <circle cx="1230" cy="270" r="52" fill="#fff6d6"/><circle cx="1252" cy="256" r="46" fill="#0f1738"/>
+  <path d="M1200 140 V560 M1020 350 H1380" stroke="#6b5b95" stroke-width="8"/>
+  <path d="M960 120 Q1010 340 960 580 L1030 580 L1030 120Z M1440 120 Q1390 340 1440 580 L1370 580 L1370 120Z" fill="#5a2c6e" opacity=".9"/>
+  <rect x="380" y="190" width="200" height="280" rx="10" fill="#3a2f5e"/><circle cx="480" cy="300" r="46" fill="#2f6fed" opacity=".7"/><rect x="410" y="380" width="140" height="10" rx="5" fill="#9cc3ff" opacity=".6"/><rect x="420" y="405" width="100" height="10" rx="5" fill="#9cc3ff" opacity=".4"/>
+  <rect x="60" y="300" width="260" height="12" fill="#4a3866"/><rect x="80" y="240" width="22" height="60" fill="#c0568a"/><rect x="106" y="252" width="18" height="48" fill="#6a8fd8"/><rect x="128" y="236" width="24" height="64" fill="#f2b84b"/>
+  <rect y="760" width="1600" height="140" fill="#241a38"/>
+  <rect x="860" y="640" width="720" height="260" rx="26" fill="#5b3a7a"/><rect x="860" y="610" width="720" height="110" rx="26" fill="#a24f8a"/><ellipse cx="990" cy="620" rx="100" ry="34" fill="#f3dcec"/>
+  <circle cx="260" cy="560" r="320" fill="url(#glow)"/><rect x="170" y="670" width="180" height="130" fill="#3a2a52"/><rect x="250" y="590" width="10" height="80" fill="#e8cfa1"/><path d="M200 590 L310 590 L290 530 L220 530Z" fill="#ffd9a0"/>
+  </svg>`;
+}
+function clinic(){
+  let bl='';for(let k=0;k<11;k++)bl+=`<rect x="1100" y="${134+k*27}" width="340" height="13" fill="#fff" opacity=".55"/>`;
+  return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#e9f5f4"/><rect y="560" width="1600" height="340" fill="#cfe7e6"/><rect y="556" width="1600" height="8" fill="#fff"/>
+  <rect x="1100" y="130" width="340" height="300" fill="#bfe6ff"/>${bl}<rect x="1100" y="130" width="340" height="300" fill="none" stroke="#fff" stroke-width="12"/>
+  <rect x="180" y="140" width="300" height="410" rx="16" fill="#fff" stroke="#9cc3ff" stroke-width="5"/><rect x="180" y="140" width="300" height="96" rx="16" fill="#2f6fed"/><text x="330" y="200" text-anchor="middle" font-size="34" font-weight="800" fill="#fff" font-family="Segoe UI,Arial,sans-serif">Octobre Rose</text>
+  ${RIB(330,356,3.2)}<text x="330" y="500" text-anchor="middle" font-size="20" font-weight="700" fill="#1b3f9a" font-family="Segoe UI,Arial,sans-serif">Dépister tôt,</text><text x="330" y="526" text-anchor="middle" font-size="20" font-weight="700" fill="#1b3f9a" font-family="Segoe UI,Arial,sans-serif">c'est sauver des vies</text>
+  <rect x="620" y="170" width="140" height="100" fill="#fff" stroke="#c9a66b" stroke-width="5"/><rect x="640" y="192" width="100" height="8" fill="#cbd5e1"/><rect x="640" y="212" width="100" height="8" fill="#cbd5e1"/><rect x="640" y="232" width="60" height="8" fill="#cbd5e1"/>
+  <rect x="790" y="170" width="140" height="100" fill="#fff" stroke="#c9a66b" stroke-width="5"/><circle cx="860" cy="220" r="26" fill="#9cc3ff"/>
+  <circle cx="960" cy="470" r="40" fill="#fff" stroke="#94a3b8" stroke-width="5"/><path d="M960 470 V444 M960 470 L980 478" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+  <g><path d="M40 760 L120 760 L110 840 L50 840Z" fill="#c2713f"/><ellipse cx="80" cy="720" rx="30" ry="70" fill="#4ea96e"/><ellipse cx="45" cy="740" rx="22" ry="52" fill="#6cc48a" transform="rotate(-22 45 740)"/><ellipse cx="115" cy="740" rx="22" ry="52" fill="#3f9a62" transform="rotate(22 115 740)"/></g>
+  <rect y="730" width="1600" height="170" fill="#b98458"/><rect y="730" width="1600" height="12" fill="#d9a877"/></svg>`;
+}
+const BG={campus:()=>campus('day'),campusEve:()=>campus('eve'),dawn:()=>campus('dawn'),grey:()=>campus('grey'),bedroom,clinic};
+
+/* ---------- SCÉNARIO ---------- */
+const QUIZ_TOTAL=4;
+const SC=[
+/* Chapitre 1 */
+{id:'start',bg:'campus',ch:"Chapitre 1 · Le stand du club",c:{L:null,C:null,R:null},w:'n',t:"Lundi de rentrée. Sur le campus, le club scientifique Ennahdha tient son stand : robots, éprouvettes, affiches… Ta mission : convaincre Sara, une étudiante brillante, de rejoindre le club."},
+{w:'n',c:{R:'amira:happy'},t:"Amira, la présidente du club, t'attend au stand avec un grand sourire."},
+{w:'amira',t:"Sara est un vrai cerveau : première de sa promo en physique. Mais elle refuse toutes les invitations. Il faut la convaincre… avec respect. Tu m'aides ?"},
+{w:'n',c:{L:'nour:serious'},t:"Un peu plus loin, Sara lit un livre, écouteurs sur les oreilles, l'air de dire : « ne me dérangez pas »."},
+{id:'q1',w:'you',t:"Comment l'abordes-tu ?",choices:[
+  {t:"« Salut Sara ! Tes résultats en physique sont impressionnants. Tu connais le club Ennahdha ? »",to:'warm',s:2,fb:"Un compliment sincère ouvre la discussion."},
+  {t:"« Rejoins-nous, c'est super, tout le monde vient ! »",to:'pushy',s:0}]},
+{id:'pushy',w:'nour',c:{L:'nour:serious'},t:"Encore quelqu'un qui me vend un club… Non merci, je n'ai pas de temps à perdre."},
+{w:'amira',c:{R:'amira:smile'},t:"Doucement… Excuse-nous, Sara. Dis-nous simplement ce que tu penses des clubs.",go:'warm'},
+{id:'warm',w:'nour',c:{L:'nour:serious'},t:"Honnêtement ? Les clubs, c'est surtout du bla-bla et des photos. Je préfère étudier seule."},
+{id:'q2',w:'you',t:"Sara pense qu'un club est une perte de temps. Quel argument choisis-tu ?",choices:[
+  {t:"« Au club, on fait de vraies expériences que les cours ne montrent pas. Et ça compte sur un CV. »",to:'r2g',s:2,fb:"Un bénéfice concret répond à son objection."},
+  {t:"« Tu verras, c'est sympa. »",to:'r2b',s:0}]},
+{id:'r2g',w:'nour',c:{L:'nour:worried'},t:"De vraies expériences ? …D'accord, ça m'intéresse un peu.",go:'shy'},
+{id:'r2b',w:'nour',c:{L:'nour:serious'},t:"« Sympa », ça ne veut rien dire."},
+{id:'shy',w:'nour',c:{L:'nour:sad'},t:"Et puis, je suis plutôt timide. Je n'ai jamais rien présenté devant du monde."},
+{w:'nour',c:{L:'nour:worried'},t:"Je vais réfléchir. Retrouvez-moi demain devant la bibliothèque."},
+
+/* Chapitre 2 */
+{id:'night',bg:'bedroom',ch:"Chapitre 2 · Les doutes de Sara",c:{L:null,R:null,C:'nour:sad'},w:'n',t:"Le soir, dans sa chambre, Sara repense à sa journée. Le club lui trotte dans la tête."},
+{w:'nour',t:"Un club scientifique… et si je n'étais pas à la hauteur ? Les autres savent sûrement déjà tout."},
+{w:'nour',c:{C:'nour:worried'},t:"Je suis bonne dans les livres. Mais dans un vrai labo, avec des gens ? Je vais passer pour une nulle."},
+{w:'nour',c:{C:'nour:sad'},t:"Et si je m'ennuyais ? Je perdrais des heures de révision. Mais… et si c'était passionnant ?"},
+{fact:{ic:'💭',title:"Pourquoi hésite-t-on à rejoindre un club ?",items:["Peur de ne pas être à la hauteur.","Timidité : on ne connaît personne.","Peur de perdre du temps sur les études.","On ne sait pas ce qu'on y fait vraiment.","On a déjà essayé un club ennuyeux."],foot:"Quand tu comprends ce qui freine l'autre, tu peux répondre à la vraie raison."}},
+
+/* Chapitre 3 */
+{id:'meet',bg:'campusEve',ch:"Chapitre 3 · Devant la bibliothèque",c:{C:null,L:'nour:worried',R:'amira:smile'},w:'n',t:"Le lendemain, en fin d'après-midi. Sara est déjà là, son livre serré contre elle."},
+{w:'amira',t:"Merci d'être venue, Sara."},
+{w:'nour',c:{L:'nour:serious'},t:"J'ai réfléchi. Mais j'ai des doutes : je ne suis pas sûre d'être au niveau, et je ne veux pas perdre mon temps."},
+{id:'q3',w:'you',t:"Comment réponds-tu ?",choices:[
+  {t:"« Je comprends. Au club, personne n'est expert au départ : on apprend ensemble, chacun à son rythme. »",to:'q3a',s:2,fb:"Rassurer, c'est répondre à la vraie peur."},
+  {t:"« Tu es la meilleure de ta promo, tu n'as aucune raison d'avoir peur. »",to:'q3b',s:1,fb:"Un compliment aide, mais il n'écoute pas la peur."},
+  {t:"« Si tu ne viens pas, c'est ton problème. »",to:'q3c',s:-1,fb:"Mettre la pression referme la porte."}]},
+{id:'q3a',w:'nour',c:{L:'nour:smile'},t:"…Ça me rassure. J'avais peur d'être la seule à ne rien savoir.",go:'proof'},
+{id:'q3b',w:'nour',c:{L:'nour:serious'},t:"C'est gentil, mais être bonne en cours ne veut pas dire que je serai utile dans un projet.",go:'proof'},
+{id:'q3c',w:'nour',c:{L:'nour:sad'},t:"Wow. Voilà exactement pourquoi je n'aime pas les clubs."},
+{w:'amira',c:{R:'amira:worried'},t:"Pardon, Sara. Il voulait juste dire que la porte reste ouverte."},
+{id:'proof',w:'amira',c:{R:'amira:happy'},t:"Viens voir ce qu'on fait vraiment. Samedi, on construit un mini-robot et on teste un capteur solaire. Entre juste pour regarder."},
+
+/* Chapitre 4 */
+{id:'lab',bg:'campus',ch:"Chapitre 4 · L'atelier du club",c:{L:'nour:worried',C:'doc:smile',R:'amira:smile'},w:'doc',t:"Bienvenue, Sara. Je suis le professeur Karim, conseiller du club. Ici, on a le droit de se tromper : c'est comme ça qu'on découvre."},
+{w:'nour',t:"Et si je ne sais pas faire ?"},
+{w:'doc',c:{C:'doc:happy'},t:"Alors tu poses des questions. Les anciens aident les nouveaux, et on se partage les tâches."},
+{w:'n',c:{L:'nour:smile'},t:"Sara regarde le robot, les capteurs, les schémas… ses yeux brillent malgré elle."},
+{w:'doc',c:{C:'doc:smile'},t:"Regarde ces deux parcours. Même étudiante, deux choix différents."},
+{compare:true},
+{w:'amira',c:{R:'amira:smile'},t:"Je ne suis pas plus douée que toi, Sara. J'ai juste osé venir le premier jour."},
+{w:'doc',c:{C:'doc:happy'},t:"Et toi, tu as su l'écouter au lieu de lui forcer la main. Voyons ce que tu retiens : vrai ou faux ?"},
+{quiz:{k:1,q:"Pour convaincre quelqu'un, il faut d'abord parler beaucoup de soi.",a:false,x:"Faux. Écouter d'abord permet de comprendre ses vraies raisons d'hésiter."}},
+{quiz:{k:2,q:"Un compliment sincère aide à créer la confiance.",a:true,x:"Vrai. À condition qu'il soit honnête et précis."}},
+{quiz:{k:3,q:"Forcer quelqu'un à venir, ça marche toujours.",a:false,x:"Faux. La pression crée du refus. Mieux vaut proposer et laisser choisir."}},
+{quiz:{k:4,q:"Il faut être expert pour entrer dans un club scientifique.",a:false,x:"Faux. Un club sert justement à apprendre, avec les autres."}},
+{fact:{ic:'🔬',title:"Ce que le club Ennahdha t'apporte",items:["Des projets concrets : robotique, énergie solaire, chimie, programmation.","Des compétences utiles : travail en équipe, prise de parole, rigueur.","Un réseau : camarades, anciens, enseignants.","Des concours, des expositions et des journées scientifiques.","Un lieu où l'on apprend en essayant, même en se trompant."],foot:"Rejoindre Ennahdha, ce n'est pas perdre du temps : c'est apprendre autrement."}},
+{w:'doc',c:{C:'doc:smile'},t:"Pour convaincre à ton tour, voici une méthode en quatre étapes."},
+{steps:[
+ {ic:'👂',t:"1 · Écouter",d:"Laisse l'autre dire ce qui le freine, sans l'interrompre ni l'étiqueter."},
+ {ic:'🧭',t:"2 · Comprendre",d:"Repère la vraie raison du refus : peur, manque de temps, doute, manque d'information."},
+ {ic:'💡',t:"3 · Répondre",d:"Donne un bénéfice concret et un exemple, pas un slogan."},
+ {ic:'🤝',t:"4 · Inviter",d:"Propose un premier pas simple (une séance d'essai) et laisse la personne choisir librement."}]},
+{w:'doc',c:{C:'doc:serious'},t:"Sara, la décision t'appartient. Qu'en penses-tu ?"},
+{route:true},
+
+/* Fin A */
+{id:'endA',bg:'dawn',ch:"Fin A · Elle rejoint Ennahdha",c:{L:'nour:smile',C:'doc:smile',R:'amira:happy'},w:'nour',t:"Je m'inscris. Merci de ne pas m'avoir forcée : c'est pour ça que j'ai dit oui."},
+{w:'doc',t:"Bienvenue chez Ennahdha, Sara."},
+{w:'n',c:{L:'nour:happy',C:null,R:'amira:happy'},t:"Quelques mois plus tard, Sara présente son premier projet devant toute la faculté : un capteur solaire à bas coût. Elle est la première à inviter les nouveaux."},
+{w:'nour',t:"J'avais peur de perdre mon temps. Je n'ai jamais autant appris."},
+{w:'amira',t:"Et la prochaine fois, c'est toi qui convaincras quelqu'un."},
+{end:'A'},
+
+/* Fin B */
+{id:'endB',bg:'dawn',ch:"Fin B · Un pas après l'autre",c:{L:'nour:worried',C:'doc:smile',R:'amira:smile'},w:'nour',t:"Bon… je viens à une séance d'essai. Pas plus, pour l'instant."},
+{w:'doc',t:"C'est déjà un très beau premier pas."},
+{w:'n',t:"Sara vient à deux séances, hésite encore, puis se laisse prendre au jeu. Elle s'inscrira avant la fin du mois."},
+{w:'amira',c:{R:'amira:happy'},t:"Un pas après l'autre. Et on ne lâche pas."},
+{end:'B'},
+
+/* Fin C */
+{id:'endC',bg:'grey',ch:"Fin C · Pas cette fois",c:{L:'nour:sad',C:'doc:serious',R:'amira:worried'},w:'nour',t:"Merci, mais non. Je préfère rester seule avec mes cours."},
+{w:'doc',t:"Je respecte ta décision. La porte du club reste ouverte."},
+{w:'n',c:{L:null},t:"Sara s'éloigne. Il n'y a pas eu de dispute, mais pas non plus de déclic."},
+{w:'amira',t:"On a peut-être trop parlé et pas assez écouté. La prochaine fois, on commencera par écouter."},
+{w:'n',t:"Ce n'est pas une catastrophe : on peut toujours retenter, autrement. Mais cette fois, le club n'a pas gagné une future chercheuse."},
+{end:'C'}
+];
+
+SC.forEach((n,k)=>n._i=k);
+const IDX={};SC.forEach((n,k)=>{if(n.id)IDX[n.id]=k;});
+let qn=0;SC.forEach(n=>{if(n.quiz)n.quiz.k=++qn;});
+
+/* ---------- MOTEUR ---------- */
+let i=0,score=0,cast={L:null,C:null,R:null},log=[],typeT=null,full='',busy=false,cur=null,mode='title',bgCur=null;
+
+function setBG(name){
+  if(name===bgCur)return;bgCur=name;
+  const a=document.querySelector('.bg.on'),b=document.querySelector('.bg:not(.on)');
+  b.innerHTML=BG[name]();b.classList.add('on');if(a)a.classList.remove('on');
+}
+function renderSlots(who){
+  for(const k of ['L','C','R']){
+    const el=$('#s'+k),v=cast[k];
+    if(v){
+      const p=v.split(':');
+      if(el.dataset.sig!==v){el.innerHTML=char(p[0],p[1],p[2]);el.dataset.sig=v;}
+      el.classList.add('show');
+      el.classList.toggle('act',!!who&&p[0]===who);
+      el.classList.toggle('dim',!!who&&NAMES[who]&&who!=='you'&&p[0]!==who);
+    }else{el.classList.remove('show','act','dim','talking');el.dataset.sig='';}
+  }
+}
+function applyCast(c){if(c)for(const k in c)cast[k]=c[k]||null;renderSlots(cur&&cur.w);}
+function setTalk(on){document.querySelectorAll('.slot').forEach(s=>s.classList.toggle('talking',on&&s.classList.contains('act')));}
+
+function show(){
+  const n=SC[i];cur=n;
+  if(n.route){go(score>=8?'endA':score>=5?'endB':'endC');return;}
+  if(n.ch){
+    mode='card';$('#dlg').classList.add('hid');$('#choices').classList.remove('on');
+    chIdx=n._i;const lab=chL(n),p=lab.split('·');
+    $('#chap').innerHTML='<small>'+p[0].trim()+'</small><h1>'+p[1].trim()+'</h1><div class="line"></div>';
+    $('#chap').classList.add('on');$('#chlabel').textContent=lab;
+    setTimeout(()=>{if(n.bg)setBG(n.bg);applyCast(n.c);},800);
+    setTimeout(()=>$('#chap').classList.remove('on'),2700);
+    setTimeout(()=>body(n),3300);
+  }else{if(n.bg)setBG(n.bg);body(n);}
+}
+function body(n){
+  applyCast(n.c);
+  if(n.fact)return showFact(n.fact);
+  if(n.quiz)return showQuiz(n.quiz);
+  if(n.steps)return showSteps(n.steps);
+  if(n.compare)return showCompare();
+  if(n.end)return showEnd(n.end);
+  say(n);
+}
+function say(n){
+  mode='dlg';$('#dlg').classList.remove('hid');
+  const nm=NAMES[n.w],tag=$('#name');
+  if(nm){tag.style.display='block';tag.textContent=nm;tag.style.background=COL[n.w];}else tag.style.display='none';
+  $('#txt').className=(n.w==='n'||n.w==='you')?'i':'';
+  full=tr(n);log.push({w:n.w,t:full});
+  $('#nxt').style.visibility='hidden';
+  renderSlots(n.w);type(full);
+}
+function type(s){
+  clearInterval(typeT);const el=$('#txt');el.textContent='';let k=0;busy=true;setTalk(true);
+  typeT=setInterval(()=>{k++;el.textContent=s.slice(0,k);if(k>=s.length)finish();},18);
+}
+function finish(){
+  clearInterval(typeT);$('#txt').textContent=full;busy=false;setTalk(false);
+  if(cur.choices)showChoices(cur.choices);else $('#nxt').style.visibility='visible';
+}
+function advance(){if(mode!=='dlg')return;if(busy)finish();else if(!cur.choices)next();}
+function next(){const n=SC[i];if(n.go)go(n.go);else{i++;show();}}
+function go(id){i=IDX[id];show();}
+
+function showChoices(ch){
+  mode='choice';const box=$('#choices');box.innerHTML='';
+  ch.forEach((c,k)=>{const b=document.createElement('button');b.className='choice';b.style.animationDelay=(k*.12)+'s';b.innerHTML='<span class="k">'+(k+1)+'</span>'+ctr(k)[0];b.onclick=()=>pick(c);box.appendChild(b);});
+  box.classList.add('on');
+}
+function pick(c){
+  sfx('pop');score+=c.s||0;$('#choices').classList.remove('on');
+  const x=ctr(cur.choices.indexOf(c));log.push({w:'you',t:'→ '+x[0]});updMeter();
+  if(x[1])toast((c.s>0?'+'+c.s+' · ':c.s<0?c.s+' · ':'')+x[1],c.s<0);
+  mode='card';setTimeout(()=>go(c.to),350);
+}
+function updMeter(){$('#fill').style.width=Math.max(0,Math.min(10,score))*10+'%';}
+function toast(m,neg){const t=$('#toast');t.textContent=m;t.className='on'+(neg?' neg':'');clearTimeout(toast.h);toast.h=setTimeout(()=>t.className='',2800);}
+
+/* modales */
+function openModal(html){mode='modal';const m=$('#modal');m.innerHTML='<div class="card">'+html+'</div>';m.classList.add('on');}
+function closeModal(){$('#modal').classList.remove('on');mode='card';next();}
+function showFact(f){
+  const e=S(cur),ti=e?e[0]:f.title,it=e?e[1]:f.items,ft=e?e[2]:f.foot;
+  sfx('chime');
+  openModal('<div class="ic">'+f.ic+'</div><h2>'+ti+'</h2><ul>'+it.map((x,k)=>'<li style="animation-delay:'+(k*.12)+'s">'+x+'</li>').join('')+'</ul><div class="foot">'+ft+'</div><button class="btn" onclick="closeModal()">'+u('cont')+'</button>');
+}
+function showQuiz(q){
+  const e=S(cur),Q=e?e[0]:q.q,X=e?e[1]:q.x;
+  openModal('<span class="tagq">'+u('tf')+' · '+q.k+' / '+QUIZ_TOTAL+'</span><h2>« '+Q+' »</h2><div class="row"><button class="qb" data-v="1">✔ '+u('t')+'</button><button class="qb" data-v="0">✘ '+u('f')+'</button></div><div id="qres"></div>');
+  document.querySelectorAll('.qb').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.v==='1',ok=v===q.a;
+    document.querySelectorAll('.qb').forEach(x=>{x.disabled=true;if((x.dataset.v==='1')===q.a)x.classList.add('ok');});
+    if(!ok)b.classList.add('ko');
+    if(ok){score++;updMeter();sfx('ok');}else sfx('ko');
+    log.push({w:'you',t:u('quiz')+Q+' → '+(ok?u('right'):u('wrong'))});
+    $('#qres').innerHTML='<div class="foot"><b>'+(ok?u('bravo'):u('notq'))+'</b>'+X+'</div><button class="btn" onclick="closeModal()">'+u('cont')+'</button>';
+  });
+}
+let stp=0;
+function showSteps(st){
+  stp=0;
+  const draw=()=>{
+    const s=st[stp],e=S(cur),t=e?e[stp][0]:s.t,d=e?e[stp][1]:s.d;
+    openModal('<span class="tagq">'+u('auto')+' · '+(stp+1)+' / '+st.length+'</span><div class="step"><div class="big">'+s.ic+'</div><h3>'+t+'</h3><p>'+d+'</p></div><div class="dots">'+st.map((_,k)=>'<i class="'+(k===stp?'on':'')+'"></i>').join('')+'</div><div class="row" style="justify-content:center">'+(stp>0?'<button class="btn ghost" id="pv">'+u('prev')+'</button>':'')+'<button class="btn" id="nx">'+(stp<st.length-1?u('nextb'):u('fin'))+'</button></div><p class="small" style="text-align:center">'+u('autoD')+'</p>');
+    sfx('pop');
+    if($('#pv'))$('#pv').onclick=()=>{stp--;draw();};
+    $('#nx').onclick=()=>{if(stp<st.length-1){stp++;draw();}else closeModal();};
+  };
+  draw();
+}
+function showCompare(){
+  const col=(c,t,arr,d0)=>'<div class="col '+c+'"><h3>'+t+'</h3>'+arr.map((e,k)=>'<div class="ev" style="animation-delay:'+(d0+k*.35)+'s"><b>'+e[0]+'</b>'+e[1]+'</div>').join('')+'</div>';
+  sfx('chime');
+  openModal('<h2>'+u('cmpT')+'</h2><div class="cmp">'+col('a',u('cmpAn'),u('cmpA'),.1)+col('n',u('cmpNn'),u('cmpN'),.3)+'</div><div class="foot">'+u('cmpF')+'</div><button class="btn" onclick="closeModal()">'+u('cont')+'</button>');
+}
+
+/* fin */
+function showEnd(k,quiet){
+  lastEnd=k;mode='end';$('#dlg').classList.add('hid');$('#choices').classList.remove('on');
+  const E=u('e'+k),s=Math.max(0,Math.min(10,score));
+  const why=k==='C'?'<div class="foot" style="text-align:start"><b>'+u('whyT')+'</b><ul style="margin:10px 0">'+u('why').map(x=>'<li>'+x+'</li>').join('')+'</ul>'+u('whyF')+'</div>':'';
+  $('#end').innerHTML='<div class="card"><div class="big">'+E[0]+'</div><h1>'+E[1]+'</h1><p>'+E[2]+'</p>'
+   +'<div class="sc"><b>'+u('score')+' : '+s+' / 10</b><div class="bar"><i style="width:'+s*10+'%"></i></div></div>'
+   +'<div class="stat">'+u(k==='C'?'statC':'stat')+'</div>'+why
+   +'<h2 style="margin-top:14px">'+u('keepT')+'</h2><ul>'+u('keep').map(x=>'<li>'+x+'</li>').join('')+'</ul>'
+   +'<div class="row" style="justify-content:center"><button class="btn" onclick="restart()">'+u('replay')+'</button><button class="btn ghost" onclick="openInfo()">'+u('about')+'</button><button class="btn ghost" onclick="openLang()">🌐 '+u('lc')+'</button></div>'
+   +'<p class="small">'+u('disc')+' · '+UNIV+'</p>'+credits()+'</div>';
+  $('#end').classList.add('on');if(!quiet)sfx('chime');
+}
+function restart(){
+  score=0;cast={L:null,C:null,R:null};log=[];updMeter();
+  $('#end').classList.remove('on');$('#modal').classList.remove('on');$('#choices').classList.remove('on');
+  ['L','C','R'].forEach(k=>{const el=$('#s'+k);el.classList.remove('show','act','dim','talking');el.dataset.sig='';});
+  i=0;mode='card';show();
+}
+
+/* aux : journal / info */
+function openAux(html){$('#aux').innerHTML='<div class="card">'+html+'<div class="row" style="margin-top:16px"><button class="btn ghost" onclick="closeAux()">'+u('close')+'</button></div></div>';$('#aux').classList.add('on');}
+function closeAux(){$('#aux').classList.remove('on');}
+function openInfo(){openAux('<h2>'+u('infoT')+'</h2>'+u('info')+'<p class="small">'+UNIV+'</p>'+credits());}
+function openLog(){
+  openAux('<h2>'+u('logT')+'</h2><div class="log">'+(log.length?log.map(l=>'<p><b style="color:'+(COL[l.w]||'#c4b5fd')+'">'+(NAMES[l.w]||u('narr'))+'</b>'+l.t+'</p>').join(''):'<p>'+u('logE')+'</p>')+'</div>');
+  const c=$('#aux .card');c.scrollTop=c.scrollHeight;
+}
+function openLang(){openAux('<h2>🌐 '+u('lang')+'</h2><div class="row">'+['fr','en','ar'].map(l=>'<button class="btn'+(l===lang?'':' ghost')+'" onclick="setLang(\''+l+'\')">'+LN[l]+'</button>').join('')+'</div>');}
+function applyStatic(){
+  document.documentElement.lang=lang;$('#stage').classList.toggle('rtl',lang==='ar');document.title=u('doc');
+  $('#kk').textContent=u('kick');$('#tt').innerHTML=u('ttl');$('#sb').textContent=u('sub');
+  $('#start').textContent='▶ '+u('start');$('#how').textContent=u('how');$('#tLang').textContent='🌐 '+u('lc');
+  $('#credit').innerHTML=credits();
+  const T={bLog:'tLog',bSnd:'tSnd',bFs:'tFs',bInfo:'tInfo',bLang:'tLang'};
+  for(const k in T)$('#'+k).title=u(T[k]);
+}
+function refresh(){
+  if($('#end').classList.contains('on')){showEnd(lastEnd,1);return;}
+  if(chIdx!=null)$('#chlabel').textContent=chL(SC[chIdx]);
+  if(mode==='dlg'||mode==='choice'){const nm=NAMES[cur.w];if(nm)$('#name').textContent=nm;full=tr(cur);finish();}
+  else if(mode==='modal'){$('#modal').classList.remove('on');body(cur);}
+}
+function setLang(l){lang=l;try{localStorage.setItem('nrLang',l);}catch(e){}closeAux();applyStatic();refresh();}
+
+/* ---------- INTERFACE ---------- */
+$('#univ').textContent=UNIV;
+try{const sl=localStorage.getItem('nrLang');if(['fr','en','ar'].includes(sl))lang=sl;}catch(e){}
+applyStatic();
+$('#tri').innerHTML=char('nour','worried')+char('doc','smile')+char('amira','happy');
+$('#bgA').innerHTML=BG.dawn();$('#bgA').classList.add('on');bgCur='dawn';
+for(let k=0;k<20;k++){const p=document.createElement('span');p.className='petal';const s=7+Math.random()*10;p.style.cssText='left:'+Math.random()*100+'%;width:'+s+'px;height:'+s+'px;animation-duration:'+(11+Math.random()*12)+'s;animation-delay:'+(-Math.random()*20)+'s;opacity:.7';$('#petals').appendChild(p);}
+
+$('#start').onclick=()=>{ac();startMusic();sfx('pop');$('#title').classList.add('gone');setTimeout(restart,500);};
+$('#how').onclick=()=>{ac();openInfo();};
+$('#bInfo').onclick=openInfo;$('#bLang').onclick=openLang;$('#tLang').onclick=openLang;
+$('#bLog').onclick=openLog;
+$('#bSnd').onclick=()=>{ac();soundOn=!soundOn;if(master)master.gain.value=soundOn?1:0;if(soundOn)startMusic();$('#bSnd').textContent=soundOn?'🔊':'🔇';};
+$('#bFs').onclick=()=>{const d=document;if(!d.fullscreenElement){(d.documentElement.requestFullscreen||d.documentElement.webkitRequestFullscreen||function(){}).call(d.documentElement);}else(d.exitFullscreen||d.webkitExitFullscreen).call(d);};
+$('#stage').addEventListener('click',e=>{
+  if(e.target.closest('button,#modal,#aux,#choices,#end,#title,#hud'))return;
+  advance();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeAux();return;}
+  if($('#aux').classList.contains('on'))return;
+  if(e.key===' '||e.key==='Enter'||e.key==='ArrowRight'){if(mode==='dlg'){e.preventDefault();advance();}}
+  if(mode==='choice'&&/^[1-9]$/.test(e.key)){const b=document.querySelectorAll('.choice')[+e.key-1];if(b)b.click();}
+});
+</script>
+</body>
+</html>
